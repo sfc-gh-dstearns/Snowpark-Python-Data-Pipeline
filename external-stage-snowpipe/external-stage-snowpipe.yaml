@@ -1,0 +1,704 @@
+schemaVersion: 1
+meta:
+  sourceVersionId: a0589e4e-b3da-4464-9ed8-2f604ae04250 # DO NOT CHANGE - Hex uses this to match up project versions when reimporting the file
+  description: "By: David Stearns - david.stearns@snowflake.com | NYC Enterprise SE, Snowpark Field CTO Associate"
+  projectId: 4cdd5a30-7eef-4995-abce-d869fb342449 # DO NOT CHANGE - Unique ID of the project from which this file was generated
+  title: External Stage + Snowpipe
+  timezone: null
+  appTheme: SYS_PREF
+  codeLanguage: PYTHON
+  status: null
+  categories: []
+  castDecimalsDefault: true
+  logicQueryCacheTimeout:
+    type: disabled
+  publishedQueryCacheTimeout: null
+projectAssets:
+  dataConnections:
+    - dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36 # stearns_snowflake (snowflake)
+  envVars: []
+  secrets: []
+sharedAssets:
+  secrets: []
+  vcsPackages: []
+  dataConnections: []
+cells:
+  - cellType: CODE
+    cellId: cdde1d58-e390-40d1-a256-4302f03afdd5 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        # Snowpark Libraries
+        import snowflake.snowpark
+        from snowflake.snowpark.functions import sproc
+        from snowflake.snowpark.functions import udf
+        from snowflake.snowpark.session import Session
+        from snowflake.snowpark import types as T
+        from snowflake.snowpark import functions as F
+        from snowflake.snowpark import Window
+
+        import hextoolkit
+        hex_snowflake = hextoolkit.get_data_connection("stearns_snowflake")
+        session = hex_snowflake.get_snowpark_session()
+  - cellType: CODE
+    cellId: e2dbcee6-2495-4c8e-9633-7db664909e94 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: session.get_current_database()
+  - cellType: CODE
+    cellId: 491b6cdb-148c-4cbb-a37f-d6a623e2fb28 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: session.use_schema("public")
+  - cellType: TEXT
+    cellId: d5b80aa3-4ec6-4c47-a9f5-945e9383a967 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: In order to get Snowpipe auto-ingest set up, we need a cloud bucket defined as a Stage in Snowflake.
+  - cellType: SQL
+    cellId: 11c825f0-7831-4320-9b47-07263ccd6a1b # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        create or replace stage snowpark_testing.public.s3_bucket
+            storage_integration = s3_integration
+            url = 's3://stearns-unload-data';
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe_3
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: false
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig: null
+  - cellType: TEXT
+    cellId: f7354e5d-048f-424b-b23b-3f52deaec34f # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: List out the bucket contents.
+  - cellType: CODE
+    cellId: ae35498a-ca71-4e78-8dc1-bfe2509e21ba # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: session.sql("ls @s3_bucket").show()
+  - cellType: TEXT
+    cellId: b310ca8c-c827-4a07-9752-f94841f3175a # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Create a landing table for the raw data.
+  - cellType: CODE
+    cellId: 74b6542f-117f-4c1a-8d53-b4dfc56e3695 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        schema = T.StructType(
+            [
+                T.StructField("ad_hit", T.VariantType())
+                ]
+            )
+        base_table = session.create_dataframe(data=[], schema=schema)
+        base_table.show()
+  - cellType: TEXT
+    cellId: af0d0c81-0232-4f2e-baeb-87a3ac92eecb # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Save the table construct in the database.
+  - cellType: CODE
+    cellId: 25344066-b0cb-4774-b409-91f59571ef08 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: base_table.write.save_as_table("ingest_table", mode="overwrite")
+  - cellType: TEXT
+    cellId: 451a6d14-e4ea-439a-9c54-ffbb96fe5a26 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Create a Stream object on the ingestion table.
+  - cellType: SQL
+    cellId: a97254de-e2b9-4525-977e-874adff5f44a # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        create or replace stream snowpark_testing.public.ad_data_ingest
+            on table snowpark_testing.public.ingest_table;
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe_4
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: false
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig: null
+  - cellType: TEXT
+    cellId: f4615c45-0a68-41e6-9ae0-a4e3b383d816 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Create a Task object to run the Stored Procedure. This Stored Procedure runs a series of Snowpark Python DataFrame API processing steps including JSON normalization, look-back calculation, Levenshtein Distance calculation, and final table append. This Task will poll the Stream on the ingestion table for new records every minute. If there are new records, it runs the Stored Procedure. If there are not any new records, the Task will sleep.
+  - cellType: SQL
+    cellId: f3fc48c0-4e63-466e-b9d1-1bb3422c2ef6 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        create or replace task snowpark_testing.public.process_ad_data
+            warehouse = snowpark
+            schedule = '1 minute'
+        when
+            system$stream_has_data('ad_data_ingest')
+        as
+            CALL demo_function();
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe_5
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: false
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig: null
+  - cellType: TEXT
+    cellId: a98d4af9-4892-4ccd-a335-d476555f9704 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Let's take a look at what the data looks like in our cloud bucket. You don't need to specify file formats for reading JSON data as Snowflake has schema detection for semi-structured data.
+  - cellType: CODE
+    cellId: 11d688dc-7b31-411d-b055-15a35f81724b # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: Df
+    config:
+      source: session.read.json("@s3_bucket").limit(2).show()
+  - cellType: TEXT
+    cellId: 5b3ac62f-fb45-44d2-aeed-55fcebf3fc66 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: As an example, let's COPY the data from the Stage to the ingestion table.
+  - cellType: CODE
+    cellId: 83a51e57-b5c2-4412-9e38-cb5e2d217b27 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        # Copy data from stage into target table - test
+        stage = session.read.json("@s3_bucket")
+        stage.copy_into_table("ingest_table", target_columns=["$1"], force=True)
+  - cellType: TEXT
+    cellId: 8c298012-d1c6-4b4d-b8d2-ac1e764248d7 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Instantiate a Snowpark DataFrame.
+  - cellType: CODE
+    cellId: 844b87eb-9b8f-451e-b2fd-f52383617d25 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: df = session.table("ingest_table")
+  - cellType: TEXT
+    cellId: 3cd4643c-c4c1-4981-9cb1-c71e7b9f7772 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: "Let's perform some testing on the pipeline we plan on running. This following query does the following:"
+        - type: ol
+          children:
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Normalizes the raw JSON data
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Sorts the data
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Creates a look-back column to compare TAG's
+  - cellType: CODE
+    cellId: a81880c5-a219-430a-88f0-de636eda9831 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        df.select(
+            F.col("ad_hit")["ID_1"].cast(T.StringType()).alias("ID_1"),
+            F.col("ad_hit")["DATE"].cast(T.IntegerType()).alias("DATE"),
+            F.col("ad_hit")["TAG"].cast(T.StringType()).alias("TAG")
+            ).sort(
+                F.col("DATE").asc(),
+                F.col("ID_1")
+                ).select(
+                    "*",
+                    F.lag(
+                            F.col("TAG")).over(
+                                window=Window.order_by(
+                                    [F.col("DATE"), F.col("ID_1")]
+                                    )
+                        ).alias("PREVIOUS_TAG")).show()
+  - cellType: TEXT
+    cellId: 383e5d1a-9e04-4200-a7c3-fffd0d2e130d # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Now to reset the infrastructure, let's recreate the artifacts.
+  - cellType: CODE
+    cellId: 2ee0b115-98f8-46e4-8ca8-1b16736db94a # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        # Recreate the ingest table
+        schema = T.StructType(
+            [
+                T.StructField("ad_hit", T.VariantType())
+                ]
+            )
+        base_table = session.create_dataframe(data=[], schema=schema)
+        base_table.write.save_as_table("ingest_table", mode="overwrite")
+
+        # Reconnect the Stream
+        session.sql("""
+            create or replace stream snowpark_testing.public.ad_data_ingest
+            on table snowpark_testing.public.ingest_table
+            """).collect()
+  - cellType: TEXT
+    cellId: 8307322c-da21-40ba-b401-c4bcaf39f871 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Create a Snowpipe with auto ingestion
+  - cellType: SQL
+    cellId: 8a8c858b-d683-4a33-bbf7-ee12c9640034 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        -- Create the Snowpipe
+        create or replace pipe snowpark_testing.public.ad_data auto_ingest=true as
+            copy into
+                snowpark_testing.public.ingest_table
+            from
+                @snowpark_testing.public.s3_bucket
+                file_format = (type = 'JSON');
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: false
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig: null
+  - cellType: TEXT
+    cellId: 7f558c2d-c9a3-4c66-bb7c-36c859c81260 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          indent: 1
+          children:
+            - text: "Use the "
+            - code: true
+              text: show pipes
+            - text: " command to view the Snowpipe information. Will need to copy the "
+            - code: true
+              text: notification_channel
+            - text: " data into our AWS S3 Bucket Event Notification configuration."
+  - cellType: SQL
+    cellId: ab3f43a5-c015-473e-bad6-62ffb44cfc8a # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: show pipes
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe_6
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: true
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig:
+        pageSize: 12
+        hideIcons: false
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        filters: null
+        columnProperties:
+          - originalName: created_on
+            renameTo: null
+            size: 242
+            wrapText: null
+            displayFormat: null
+          - originalName: name
+            renameTo: null
+            size: 101
+            wrapText: null
+            displayFormat: null
+          - originalName: database_name
+            renameTo: null
+            size: 157
+            wrapText: null
+            displayFormat: null
+          - originalName: schema_name
+            renameTo: null
+            size: 150
+            wrapText: null
+            displayFormat: null
+          - originalName: definition
+            renameTo: null
+            size: 400
+            wrapText: null
+            displayFormat: null
+          - originalName: owner
+            renameTo: null
+            size: 50
+            wrapText: null
+            displayFormat: null
+          - originalName: notification_channel
+            renameTo: null
+            size: 399
+            wrapText: null
+            displayFormat: null
+          - originalName: comment
+            renameTo: null
+            size: 251
+            wrapText: null
+            displayFormat: null
+          - originalName: integration
+            renameTo: null
+            size: 129
+            wrapText: null
+            displayFormat: null
+          - originalName: pattern
+            renameTo: null
+            size: 110
+            wrapText: null
+            displayFormat: null
+          - originalName: error_integration
+            renameTo: null
+            size: 162
+            wrapText: null
+            displayFormat: null
+        columnOrdering: null
+  - cellType: TEXT
+    cellId: c2ff0f06-5082-4e6a-9c45-c3ee24dddd26 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: "Checking on the current status of the Snowpipe. Looking for "
+            - code: true
+              text: '"executionState":"RUNNING"'
+  - cellType: SQL
+    cellId: 5d8c0271-29f0-4afb-ab02-4e77b667097c # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: select SYSTEM$PIPE_STATUS('snowpark_testing.public.ad_data')
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe_7
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: true
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig:
+        pageSize: 12
+        hideIcons: false
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        filters: null
+        columnProperties:
+          - originalName: SYSTEM$PIPE_STATUS('SNOWPARK_TESTING.PUBLIC.AD_DATA')
+            renameTo: null
+            size: 400
+            wrapText: null
+            displayFormat: null
+        columnOrdering: null
+  - cellType: TEXT
+    cellId: c20a0f7f-e52b-4c04-9056-189aa6b6243a # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Now we're ready to kick the demo off. Go ahead and resume the task.
+  - cellType: SQL
+    cellId: b3fb3d1c-d28e-474b-9d8a-b59bb4a71ed0 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: alter task snowpark_testing.public.process_ad_data resume;
+      dataFrameCell: false
+      dataConnectionId: 7fdea372-fcd4-4b03-860c-ae4fef32ca36
+      resultVariableName: dataframe_8
+      enableCache: false
+      runOnLoad: false
+      runOnSchedule: false
+      useRichDisplay: true
+      sqlCellOutputType: PANDAS
+      useQueryMode: false
+      castDecimals: true
+      useNativeDates: true
+      allowDuplicateColumns: false
+      tableDisplayConfig:
+        pageSize: 12
+        hideIcons: false
+        hideIndex: false
+        defaultSortColumn: null
+        defaultSortIndexColumn: null
+        defaultSortDirection: ASC
+        conditionalFormatting: null
+        filters: null
+        columnProperties:
+          - originalName: SYSTEM$PIPE_FORCE_RESUME('SNOWPARK_TESTING.PUBLIC.AD_DATA')
+            renameTo: null
+            size: 400
+            wrapText: null
+            displayFormat: null
+          - originalName: Updated rows
+            renameTo: null
+            size: 146
+            wrapText: null
+            displayFormat: null
+        columnOrdering: null
+appLayout:
+  fullWidth: false
+  visibleMetadataFields:
+    - NAME
+    - DESCRIPTION
+    - AUTHOR
+    - LAST_EDITED
+    - LAST_RUN
+    - CATEGORIES
+    - STATUS
+    - TABLE_OF_CONTENTS
+  rows:
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: e2dbcee6-2495-4c8e-9633-7db664909e94
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: d5b80aa3-4ec6-4c47-a9f5-945e9383a967
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: f7354e5d-048f-424b-b23b-3f52deaec34f
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: b310ca8c-c827-4a07-9752-f94841f3175a
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: af0d0c81-0232-4f2e-baeb-87a3ac92eecb
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 451a6d14-e4ea-439a-9c54-ffbb96fe5a26
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: f4615c45-0a68-41e6-9ae0-a4e3b383d816
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: a98d4af9-4892-4ccd-a335-d476555f9704
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 5b3ac62f-fb45-44d2-aeed-55fcebf3fc66
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 83a51e57-b5c2-4412-9e38-cb5e2d217b27
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 8c298012-d1c6-4b4d-b8d2-ac1e764248d7
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 3cd4643c-c4c1-4981-9cb1-c71e7b9f7772
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 383e5d1a-9e04-4200-a7c3-fffd0d2e130d
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 8307322c-da21-40ba-b401-c4bcaf39f871
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 7f558c2d-c9a3-4c66-bb7c-36c859c81260
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: c2ff0f06-5082-4e6a-9c45-c3ee24dddd26
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: c20a0f7f-e52b-4c04-9056-189aa6b6243a
+              height: null
+              showLabel: true
