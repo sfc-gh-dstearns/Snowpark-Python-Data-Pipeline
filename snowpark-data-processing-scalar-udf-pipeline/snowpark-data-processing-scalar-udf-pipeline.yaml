@@ -1,0 +1,463 @@
+schemaVersion: 1
+meta:
+  sourceVersionId: 34d792e9-9a6f-4e7a-8326-8e44e7f25337 # DO NOT CHANGE - Hex uses this to match up project versions when reimporting the file
+  description: "By: David Stearns - david.stearns@snowflake.com | NYC Enterprise SE, Snowpark Field CTO Associate"
+  projectId: 7b1a7a05-9f4f-4121-8ef1-17cb5e33538d # DO NOT CHANGE - Unique ID of the project from which this file was generated
+  title: Snowpark Data Processing + Scalar UDF + Pipeline
+  timezone: null
+  appTheme: SYS_PREF
+  codeLanguage: PYTHON
+  status: null
+  categories: []
+  castDecimalsDefault: true
+  logicQueryCacheTimeout: null
+  publishedQueryCacheTimeout: null
+projectAssets:
+  dataConnections:
+    - dataConnectionId: 917ad076-66fa-4722-8da3-7442b8250850 # stearns_snowflake (snowflake)
+  envVars: []
+  secrets: []
+sharedAssets:
+  secrets: []
+  vcsPackages: []
+  dataConnections: []
+cells:
+  - cellType: TEXT
+    cellId: ceaa73f4-7bf7-4407-8a14-13dbf2338aab # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: h3
+          children:
+            - text: Why I Made This
+        - type: paragraph
+          children:
+            - text: "A customer was asking how to make their Python code run better on Snowflake. They were trying to deploy a stored procedure where they downloaded the database table to local memory via "
+            - code: true
+              text: .toPandas()
+            - text: "(SLOW) and use Pandas to run processing and business logic. I told them they need to use the Snowpark DataFrame API. I wasn’t sure at first how much of their code was going to be able to be pushed to Snowflake but it ended up that the whole thing could be. An additional ask was made to implement a Python string-similarity library as part of the business logic. So I created a Scalar UDF using the library they asked about (Levenshtein Distance, "
+            - code: true
+              text: python-Levenshtein.distance
+            - text: "). "
+        - type: paragraph
+          children:
+            - text: You’ll hear lots about Vectorized and Scalar UDF’s. Vectorized UDFs can receive a data frame and output a series. Scalar UDF’s can’t - they operate row by row and have to receive data that way. Because the Levenshtein Distance module isn’t a vectorized module, I was forced to use a Scalar UDF. Even then, it is still pretty fast. You can use this notebook if you want as a quick demo / learning.
+        - type: paragraph
+          children:
+            - text: ""
+        - type: h3
+          children:
+            - bold: true
+              text: Important Bits of Info
+        - type: paragraph
+          children:
+            - bold: true
+              text: This is a read-only copy!!! You have to make a duplicate for yourself!!!
+              underline: true
+        - type: paragraph
+          children:
+            - text: The data is attached in this notebook environment as a pickle file. To set up the Snowpark portion of the demo, you'll open the file in Pandas and push it to Snowflake. We'll also create a database for this to live. I won't bother creating a schema, but you can.
+  - cellType: TEXT
+    cellId: 73bc115b-1ff7-4840-9a06-52e6dee178f2 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: h3
+          children:
+            - text: "Solution Overview "
+        - type: ul
+          children:
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Run the code in a container via Stored Procedure
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: The Stored Procedure will act as a scaffold for the code to run
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Stored Procedures are single node operations, but processes they kick off run in a distributed manner
+                - type: ul
+                  children:
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - text: "In this case, the data processing and UDF steps will run in their normal parallelized fashion "
+        - type: h3
+          children:
+            - text: "The initial set up steps are:"
+        - type: ul
+          children:
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Create a Stage for the code to live, if needed (required even if it isn't used, can use any Stage but I create one in this example for completeness).
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: Create a UDF for the Levenshtein Distance calculation.
+                - type: ul
+                  children:
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - text: "This will be a "
+                            - text: "Scalar UDF "
+                              italic: true
+                            - text: "because the "
+                            - code: true
+                              text: python-Levenshtein.distance
+                            - text: " module is not vectorized. It does not receive a Series, rather, it receives a scalar input of (string, string). This is okay, because Snowflake will still run the processing quickly due to distribution."
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: "Create a Stored Procedure which takes advantage of the UDF and runs the rest of the procedural code:"
+                - type: ul
+                  children:
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - text: Cleans, sorts, and processes the raw data.
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - text: Runs the Levenshtein calculation.
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - text: "Implements business logic and creates a new column - "
+                            - code: true
+                              text: ID_2
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - text: "Saves the data back to the database table via "
+                            - code: true
+                              text: append
+        - type: p
+          children:
+            - bold: true
+              text: "Make sure your session is using the database and schema you want to use going forward, as you will be creating these objects in whichever "
+            - bold: true
+              code: true
+              text: database.schema
+            - bold: true
+              text: " you're currently using. This is easily checked by running the following:"
+        - type: ul
+          children:
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: "To check the current session environment:"
+                - type: ul
+                  children:
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - code: true
+                              text: session.get_current_database().collect()
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - code: true
+                              text: session.get_current_schema().collect
+                            - text: "  "
+            - type: li
+              children:
+                - type: lic
+                  children:
+                    - text: "If you need to change the session environment:"
+                - type: ul
+                  children:
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - code: true
+                              text: session.use_database("your_db_name")
+                    - type: li
+                      children:
+                        - type: lic
+                          children:
+                            - code: true
+                              text: session.use_schema("your_schema_name")
+  - cellType: CODE
+    cellId: 2f1c84e2-790b-45e8-9d31-c8b7bafa2988 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        import pandas as pd
+        import pickle
+        from time import sleep
+
+        # Snowpark Libraries
+        import snowflake.snowpark
+        from snowflake.snowpark.functions import sproc
+        from snowflake.snowpark.functions import udf
+        from snowflake.snowpark.session import Session
+        from snowflake.snowpark import types as T
+        from snowflake.snowpark import functions as F
+        from snowflake.snowpark import Window
+
+        import hextoolkit
+        hex_snowflake = hextoolkit.get_data_connection("stearns_snowflake")
+        session = hex_snowflake.get_snowpark_session()
+        query_history = session.table("snowflake.account_usage.query_history").sort(F.col("start_time").desc())
+        current_warehouse = session.get_current_warehouse()
+  - cellType: CODE
+    cellId: 595179a0-07c2-4d59-96d2-24cf1f3dae87 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: session.sql("create or replace stage demo").collect()
+  - cellType: CODE
+    cellId: c2ee5a1d-a5d9-411a-86e5-70db4464e87e # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        """ This step creates and registers the Scalar UDF for Levenshtein Distance calculation. """
+
+        session.add_packages('snowflake-snowpark-python', 'python-Levenshtein')
+        @udf(name="levenshtein_distance", is_permanent=True, stage_location="@demo", replace=True)
+        def lev_dist(TAG: str, PREVIOUS_TAG: str) -> int:
+            from Levenshtein import distance as lev
+            return lev(TAG, PREVIOUS_TAG)
+  - cellType: TEXT
+    cellId: a1db0f81-441c-4bf7-9d29-1e1686984ba3 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: h2
+          children:
+            - text: Vision
+        - type: p
+          children:
+            - text: As advertising data streams into Snowflake via Snowpipe, it will populate a Streaming Table which kicks off a Task. The Task contains a CALL command to the Stored Procedure you will create below. The Stored Procedure processes the data from this table and applies business logic with the help of the UDF we created just before. Once this data is fully processed, it can be appended to the final table where the business can use it for BI or further Data Science analysis.
+            - src: /api/v1/file/82a1b261-6cf3-4db5-b156-48524975f891
+              type: image
+              width: 1063
+              children:
+                - text: ""
+            - text: ""
+  - cellType: CODE
+    cellId: b96cf08b-739b-429a-a956-08ca6c4fbb59 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: session.use_schema("public")
+  - cellType: CODE
+    cellId: 0471c28d-58d6-4de9-adfa-cd4748feff6f # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        """ This step creates the Stored Procedure Python script that will run in Snowflake when invoked.
+        It performs the entire procedure of processing the data, running the Levenshtein calculation,
+        applying business logic, and saving the data back to the database table. """
+
+        session.add_packages('snowflake-snowpark-python')
+        def demo_sproc(session: snowflake.snowpark.Session) -> str:
+
+            import snowflake.snowpark
+            from snowflake.snowpark.functions import sproc
+            from snowflake.snowpark.functions import udf
+            from snowflake.snowpark.session import Session
+            from snowflake.snowpark import types as T
+            from snowflake.snowpark import functions as F
+            from snowflake.snowpark import Window
+
+            data = session.table("ingest_table")
+
+            ###########################################################################
+            """First, we'll normalize the ingested JSON data, create a sorted data frame
+                and the PREVIOUS_TAG "look-back" column. We can do this all in one step.
+                This will create a leading NULL value (first row only, keep this in mind).
+            """
+            ###########################################################################
+
+            # F.sort() performs the order by
+            # F.lag() statement performs the "look back" to create a column holding the previous row's data
+            data_norm_sort = data.select(
+                # Normalization
+                F.col("ad_hit")["ID_1"].cast(T.StringType()).alias("ID_1"),
+                F.col("ad_hit")["DATE"].cast(T.IntegerType()).alias("DATE"),
+                F.col("ad_hit")["TAG"].cast(T.StringType()).alias("TAG")
+                ).sort(
+                    # Sorting and look-back column creation
+                    F.col("DATE").asc(),
+                    F.col("ID_1")
+                    ).select(
+                        "*",
+                        F.lag(
+                                F.col("TAG")).over(
+                                    window=Window.order_by(
+                                        [F.col("DATE"), F.col("ID_1")]
+                                        )
+                            ).alias("PREVIOUS_TAG"))
+
+            ###################################################################################
+            """Finally, use an IF-ELSE statement combined with the Levenshtein Distance UDF
+               to apply business logic and also output the Levenshtein Distance value for each row,
+               then append the data to the database table.
+           """
+            ###################################################################################
+
+            # Make sure to .filter() for the NULL value in the first row (NULL causes error in Levenshtein calc)
+            data_norm_sort.filter(
+                data_norm_sort["PREVIOUS_TAG"].isNotNull()
+                ).select(
+                    *data_norm_sort,
+                    F.iff(
+                        F.call_udf("levenshtein_distance", [F.col("TAG"), F.col("PREVIOUS_TAG")]) > 0,
+                        # if true
+                        F.col("TAG"),
+                        # if false
+                        F.col("TAG")
+                    ).alias("ID_2"),
+                    # UDF output tracking column
+                    F.call_udf("levenshtein_distance", [F.col("TAG"), F.col("PREVIOUS_TAG")]).alias("levenshtein_distance")
+                ).write.save_as_table("enhanced_ad_data", mode="append")
+
+            db = session.get_current_database()
+            schema = session.get_current_schema()
+            table = '"ENHANCED_AD_DATA"'
+            count = data_norm_sort.filter(data_norm_sort["PREVIOUS_TAG"].isNotNull()).count()
+
+            return f"Done. Added {count} rows of cleaned and processed data to the table {db}.{schema}.{table}."
+  - cellType: CODE
+    cellId: 90a144ad-0947-4fd1-ba26-94812f8c2b80 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        """ This step registers the Stored Procedure in Snowflake. """
+
+        print(f"Registering the Stored Procedure in {session.get_current_database()}.{session.get_current_schema()}")
+        print("-------------------------------------------")
+        demo_function = session.sproc.register(demo_sproc, replace=True,
+                                                 is_permanent=True, name="demo_function", stage_location="demo")
+        print("Done.")
+  - cellType: TEXT
+    cellId: fa8d21d8-8168-429d-9af2-f963393a339c # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Test out the Stored Procedure
+  - cellType: CODE
+    cellId: 19facf6b-0f41-4a5a-9aae-c3ee163c3acf # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: |-
+        """ This step runs the Stored Procedure. If you look in your Snowflake history, it will show "CALL <my_proc_name>". """
+
+        demo_function(session=session)
+  - cellType: TEXT
+    cellId: 1e16fa10-0e9a-4eb1-93fc-608acdd7c04b # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      richText:
+        - type: paragraph
+          children:
+            - text: Take a look to ensure the data got to the table correctly
+  - cellType: CODE
+    cellId: 4efda403-3e0e-48fd-9565-d52280edb9d2 # DO NOT CHANGE - Hex uses this to match up cells when reimporting the file, and detect any changes to existing cells
+    cellLabel: null
+    config:
+      source: session.table("enhanced_ad_data").show()
+appLayout:
+  fullWidth: false
+  visibleMetadataFields:
+    - NAME
+    - DESCRIPTION
+    - AUTHOR
+    - LAST_EDITED
+    - LAST_RUN
+    - CATEGORIES
+    - STATUS
+    - TABLE_OF_CONTENTS
+  rows:
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: ceaa73f4-7bf7-4407-8a14-13dbf2338aab
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 73bc115b-1ff7-4840-9a06-52e6dee178f2
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 595179a0-07c2-4d59-96d2-24cf1f3dae87
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: a1db0f81-441c-4bf7-9d29-1e1686984ba3
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: fa8d21d8-8168-429d-9af2-f963393a339c
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 19facf6b-0f41-4a5a-9aae-c3ee163c3acf
+              height: null
+              showLabel: true
+    - columns:
+        - start: 0
+          end: 120
+          elements:
+            - showSource: false
+              hideOutput: false
+              type: CELL
+              cellId: 1e16fa10-0e9a-4eb1-93fc-608acdd7c04b
+              height: null
+              showLabel: true
